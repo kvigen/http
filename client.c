@@ -6,8 +6,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "utils.c"
 
-int main(int argc, char *argv[]) {
+// TODO: Switch from writing to stdout to stderr where appropriate
+int main(int argc, char* argv[]) {
   struct addrinfo hints;
   struct addrinfo *addrInfo;
 
@@ -25,11 +27,11 @@ int main(int argc, char *argv[]) {
 
   // TODO: Could also use inet_conenct instead of what's below to make this shorter.
   // It absracts away many of these details.
-  // TODO: Support https???
+  // TODO: Support https??? Also just support all kinds of ports...
   // TODO: Actually parse the argument. In particular this doesn't work for anything
   // that has a non '/' request. See below in the GET request and this connection code
   // here.
-  if (getaddrinfo(argv[1], "http", &hints, &addrInfo) != 0) {
+  if (getaddrinfo(argv[2], "http", &hints, &addrInfo) != 0) {
     perror("Couldn't get address info");
     exit(2);
   }
@@ -54,6 +56,10 @@ int main(int argc, char *argv[]) {
       break;
     }
     close(socketFd);
+  }
+  if (current == NULL) {
+    fprintf(stderr, "Could not connect to any socket");
+    exit(1);
   }
 
   freeaddrinfo(addrInfo);
@@ -124,41 +130,4 @@ int getResponseCode(socketFd) {
   char* codeStr = strsep(&line, " ");
   int returnCode = strtol(codeStr, (char**) NULL, 10);
   return returnCode;
-}
-
-// Read line returns a line read. Note that if the line length is greater
-// than bufferLen then this won't return the full line.
-int readLine(int socketFd, char* buffer, int bufferLen) {
-  int index = 0;
-  int lastCarriageReturn = 0;
-  for (;;) {
-    char temp[1];
-    int numRead = read(socketFd, temp, 1);
-    // In a well written program would this actually error or just return -1???
-    if (numRead == -1) {
-      perror("Read failure");
-      exit(4);
-    } else if (numRead == 0) {
-      break;
-    }
-    // Actually do something to test a line-end here...
-    if (temp[0] == '\r') {
-      // TODO: Handle two carriage returns in a row...
-      lastCarriageReturn = 1;
-      continue;
-    } else if (temp[0] == '\n' && lastCarriageReturn == 1) {
-      break;
-    }
-    if (lastCarriageReturn) {
-      buffer[index] = '\r';
-      index++;
-    }
-    lastCarriageReturn = 0;
-    buffer[index] = temp[0];
-    index++;
-    if (index >= bufferLen) {
-      break;
-    }
-  }
-  return index;
 }
