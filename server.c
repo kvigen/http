@@ -1,10 +1,13 @@
+#include <fcntl.h>
 #include <netdb.h>
-#include <unistd.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/sendfile.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "utils.c"
 
 void doWork(int socketFd);
@@ -114,8 +117,24 @@ void write404(int clientFd) {
 // TODO: We should use sendfile here. Maybe this could actually become a true
 // file server then...
 void write200(int clientFd) {
-  char* response = "HTTP/1.1 200 Success\r\n\r\n<body></body>\r\n";
-  if (write(clientFd, response, strlen(response)) != strlen(response)) {
+  // TODO: Add in some headers...
+  // TODO: An optimization here would be to use TCP_CORK to avoid sending two packets
+  char* responseCode = "HTTP/1.1 200 Success\r\n\r\n";
+  if (write(clientFd, responseCode, strlen(responseCode)) != strlen(responseCode)) {
     perror("Error writing");
+  }
+  // TODO: Provide more flexibility on the file location
+  int indexFd = open("test_output/index.html", O_RDONLY);
+  if (indexFd == -1) {
+    perror("Couldn't find index file");
+    // TODO: What to do...??? Here is where a 404 would be appropriate
+  }
+  // TODO: Make sendfile actually send the right length for the data. Get from stats
+  if (sendfile(clientFd, indexFd, 0, 10000) == -1) {
+    perror("Error with sendfile");
+  }
+
+  if (close(indexFd) == -1) {
+    perror("Couldn't close file");
   }
 }
